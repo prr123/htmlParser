@@ -53,9 +53,11 @@ func main() {
     outFil := ""
     outval, ok := flagMap["out"]
     if !ok {
-        log.Fatalf("error -- no out flag provided!\n")
+		outFil = inFil
+//      log.Fatalf("error -- no out flag provided!\n")
     } else {
-        if outval.(string) == "none" {log.Fatalf("error -- no output file name provided!\n")}
+        if outval.(string) == "none" {outFil = inFil}
+//{log.Fatalf("error -- no output file name provided!\n")}
         outFil = outval.(string)
     }
 
