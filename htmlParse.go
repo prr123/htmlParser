@@ -13,6 +13,15 @@ import (
     cliutil "github.com/prr123/utility/utilLib"
 )
 
+type node struct {
+	pnode *node
+	typ string
+	children []*node
+	att map[string]string
+	txt string
+	ni int
+}
+
 func main() {
 
     numarg := len(os.Args)
@@ -75,9 +84,19 @@ func main() {
 	r := bytes.NewReader(source)
 	l := html.NewLexer(parse.NewInput(r))
 
-	for {
+	tt, data := l.Next()
+	if tt !=  html.StartTagToken {log.Fatalf("invalid start token!\n")}
+	top := new(node)
+	top.typ = string(data[1:])
+	top.att = make (map[string]string)
+	top.ni = 0
+	last := false
+	par := top
+	PrintAst(top)
+
+	for ni:=1; ni< 50; ni++ {
 		tt, data := l.Next()
-		fmt.Printf("token type: %s data [%d]: %s\n", tt.String(), len(data), data)
+		fmt.Printf("%d -- token type: %s data [%d]: %s\n", ni, tt.String(), len(data), data)
 
 		switch tt {
 		case html.ErrorToken:
@@ -85,34 +104,91 @@ func main() {
 
 		return
 		case html.StartTagToken:
-		// ...
-			for {
-				ttAttr, dataAttr := l.Next()
-				if ttAttr != html.AttributeToken {break}
-				fmt.Printf("  ttAttr: %s dataAttr: %s\n", ttAttr, dataAttr)
-			}
+			fmt.Printf("dbg -- token: %s\n", data[1:])
+	PrintAst(par)
+			n := new(node)
+			(*n).typ = string(data[1:])
+			(*n).att = make (map[string]string)
+			(*n).ni = ni
+			(*n).pnode = par
+			(*par).children = append((*par).children, n)
+fmt.Printf("parent typ: %s children: %d\n", (*par).typ, len((*par).children))
+
+			par = n
+PrintAst(top)
 
 		case html.EndTagToken:
+			fmt.Printf("dbg -- end token: %s\n", data)
+			par = par.pnode
+			if par == nil {last = true}
 
 		case html.StartTagCloseToken:
+			fmt.Printf("dbg -- close token token: %s\n", data)
 
 		case html.StartTagVoidToken:
+			fmt.Printf("dbg -- void token: %s\n", data)
 
 		case html.AttributeToken:
+			fmt.Printf("dbg -- att token: %s\n", data)
+			fmt.Printf("  ttAttr: %s dataAttr: %s\n", tt, data)
+			par.att[string(tt)] = string(data)
 
 		case html.TextToken:
-
-
+			fmt.Printf("dbg -- text[%d]: %s\n", len(data), data)
+			if len(data) >1 {
+				par.txt = string(data)
+			} 
+/*
+else {
+				fmt.Println("dbg -- end ***")
+				last = true
+			}
+*/
 		case html.CommentToken:
-
+			fmt.Printf("dbg -- comment: %s\n", data)
 
 		case html.DoctypeToken:
+			fmt.Printf("dbg -- doc token: %s\n", data)
 
 		default:
+			fmt.Printf("dbg -- unknown token: %s\n", data)
 
 		}
 
+		if last {
+			fmt.Println("*** last ***")
+			break
+		}
 	} //for loop end
 
+	fmt.Println ("*** ast ***")
+	PrintAst(top)
 
+}
+
+func PrintAst(n *node) {
+
+	prnode(n)
+	chnum := len((*n).children)
+//    fmt.Printf("children [%d]\n", chnum)
+    for i:= 0; i< chnum; i++ {
+		ch := (*n).children[i]
+		PrintAst(ch)
+	}
+}
+
+func prnode (n *node) {
+	fmt.Printf("type: %s\n", n.typ)
+	par := (*n).pnode
+	if par == nil {
+		fmt.Println("no parent")
+	} else {
+		fmt.Printf("parent: %s\n", par.typ)
+	}
+	chnum := len((*n).children)
+	fmt.Printf("children [%d]\n", chnum)
+	for i:= 0; i< chnum; i++ {
+		ch := (*n).children[i]
+		fmt.Printf("child[%d]-- typ: %s\n", i,(*ch).typ)
+	}
 }
