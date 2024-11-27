@@ -91,6 +91,7 @@ func main() {
 	top.att = make (map[string]string)
 	top.ni = 0
 	last := false
+	txt := false
 	par := top
 	PrintAst(top)
 
@@ -105,24 +106,25 @@ func main() {
 		return
 		case html.StartTagToken:
 			fmt.Printf("dbg -- token: %s\n", data[1:])
-	PrintAst(par)
+//	PrintAst(par)
 			n := new(node)
 			(*n).typ = string(data[1:])
 			(*n).att = make (map[string]string)
 			(*n).ni = ni
 			(*n).pnode = par
 			(*par).children = append((*par).children, n)
-fmt.Printf("parent typ: %s children: %d\n", (*par).typ, len((*par).children))
-
+//fmt.Printf("parent typ: %s children: %d\n", (*par).typ, len((*par).children))
 			par = n
-PrintAst(top)
+//PrintAst(top)
 
 		case html.EndTagToken:
 			fmt.Printf("dbg -- end token: %s\n", data)
+			txt = false
 			par = par.pnode
 			if par == nil {last = true}
 
 		case html.StartTagCloseToken:
+			txt = true
 			fmt.Printf("dbg -- close token token: %s\n", data)
 
 		case html.StartTagVoidToken:
@@ -135,15 +137,9 @@ PrintAst(top)
 
 		case html.TextToken:
 			fmt.Printf("dbg -- text[%d]: %s\n", len(data), data)
-			if len(data) >1 {
+			if txt {
 				par.txt = string(data)
-			} 
-/*
-else {
-				fmt.Println("dbg -- end ***")
-				last = true
 			}
-*/
 		case html.CommentToken:
 			fmt.Printf("dbg -- comment: %s\n", data)
 
@@ -179,6 +175,11 @@ func PrintAst(n *node) {
 
 func prnode (n *node) {
 	fmt.Printf("type: %s\n", n.typ)
+	if len((*n).txt) > 1 {
+		fmt.Printf("text: %s\n", (*n).txt)
+	} else {
+		fmt.Printf("no text\n")
+	}
 	par := (*n).pnode
 	if par == nil {
 		fmt.Println("no parent")
@@ -186,9 +187,14 @@ func prnode (n *node) {
 		fmt.Printf("parent: %s\n", par.typ)
 	}
 	chnum := len((*n).children)
-	fmt.Printf("children [%d]\n", chnum)
+	if chnum > 0 {
+		fmt.Printf("children [%d]\n", chnum)
+	} else {
+		fmt.Printf("no children\n")
+	}
 	for i:= 0; i< chnum; i++ {
 		ch := (*n).children[i]
-		fmt.Printf("child[%d]-- typ: %s\n", i,(*ch).typ)
+		fmt.Printf("child[%d] -- typ: %s\n", i,(*ch).typ)
+//		fmt.Printf("child[%d] -- txt: %s\n", i,(*ch).txt)
 	}
 }
