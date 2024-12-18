@@ -91,110 +91,159 @@ func main() {
 	top.att = make (map[string]string)
 	top.ni = 0
 	last := false
-	txt := false
-	par := top
-	PrintAst(top)
-
+//	txt := false
+//	par := nil
+	if dbg {PrintAst(top, "top")}
+	cnod := top
+	istate := 2
+	nlev := 0
 	for ni:=1; ni< 50; ni++ {
 		tt, data := l.Next()
-		fmt.Printf("%d -- token type: %s data [%d]: %s\n", ni, tt.String(), len(data), data)
+		if dbg {fmt.Printf("%d -- token type: %s data [%d]: %s\n", ni, tt.String(), len(data), data)}
 
 		switch tt {
 		case html.ErrorToken:
 		// error or EOF set in l.Err()
+			return
 
-		return
 		case html.StartTagToken:
-			fmt.Printf("dbg -- token: %s\n", data[1:])
+			if dbg {fmt.Printf("dbg -- token: %s\n", data[1:])}
+			switch istate {
+			case 0:
+				istate = 1
+			// nested token
+			case 2,3:
+				nlev++
+				istate = 1
+			default:
+				log.Fatalf("error -- invalid state %d for StartTagToken!\n", istate)
+			}
 //	PrintAst(par)
 			n := new(node)
 			(*n).typ = string(data[1:])
 			(*n).att = make (map[string]string)
 			(*n).ni = ni
-			(*n).pnode = par
-			(*par).children = append((*par).children, n)
+			(*n).pnode = cnod
+			cnod.children = append(cnod.children, n)
 //fmt.Printf("parent typ: %s children: %d\n", (*par).typ, len((*par).children))
-			par = n
 //PrintAst(top)
+			cnod = n
 
 		case html.EndTagToken:
-			fmt.Printf("dbg -- end token: %s\n", data)
-			txt = false
-			par = par.pnode
-			if par == nil {last = true}
+			if dbg {fmt.Printf("dbg -- end token: %s\n", data)}
+			switch istate {
+			// attributes
+			case 2, 3:
+				if nlev>0 {
+					nlev--
+				}
+				istate = 0
+			default:
+				log.Fatalf("error -- invalid state %d for StartTagCloseToken!\n", istate)
+			}
+//			txt = false
+			cnod = cnod.pnode
+			if cnod.pnode == nil {last = true}
 
 		case html.StartTagCloseToken:
-			txt = true
-			fmt.Printf("dbg -- close token token: %s\n", data)
+			if dbg {fmt.Printf("dbg -- close token token: %s\n", data)}
+			switch istate {
+			// attributes
+			case 1, 2:
+				istate = 3
+			default:
+				log.Fatalf("error -- invalid state %d for StartTagCloseToken!\n", istate)
+			}
 
 		case html.StartTagVoidToken:
-			fmt.Printf("dbg -- void token: %s\n", data)
+			if dbg {fmt.Printf("dbg -- void token: %s\n", data)}
 
 		case html.AttributeToken:
-			fmt.Printf("dbg -- att token: %s\n", data)
-			fmt.Printf("  ttAttr: %s dataAttr: %s\n", tt, data)
-			par.att[string(tt)] = string(data)
+			if dbg {fmt.Printf("dbg -- att token: %s\n", data)}
+			switch istate {
+			case 1, 2:
+				istate = 2
+				if dbg {fmt.Printf("  key: %s val: %s\n", l.AttrKey(), l.AttrVal())}
+				if cnod.att == nil {cnod.att = make (map[string]string)}
+				cnod.att[string(l.AttrKey())] = string(l.AttrVal())
+
+			default:
+				log.Fatalf("error -- invalid state %d for StartTagCloseToken!\n", istate)
+			}
 
 		case html.TextToken:
-			fmt.Printf("dbg -- text[%d]: %s\n", len(data), data)
-			if txt {
-				par.txt = string(data)
+			if dbg {fmt.Printf("dbg -- text[%d]: %s\n", len(data), data)}
+			switch istate {
+			case 3:
+				cnod.txt = string(data)
+			default:
+				log.Fatalf("error -- invalid state %d for TextToken!\n", istate)
 			}
+
 		case html.CommentToken:
-			fmt.Printf("dbg -- comment: %s\n", data)
+			if dbg {fmt.Printf("dbg -- comment: %s\n", data)}
 
 		case html.DoctypeToken:
-			fmt.Printf("dbg -- doc token: %s\n", data)
+			if dbg {fmt.Printf("dbg -- doc token: %s\n", data)}
 
 		default:
-			fmt.Printf("dbg -- unknown token: %s\n", data)
+			log.Fatalf("unknown token: %s\n", data)
 
 		}
 
 		if last {
-			fmt.Println("*** last ***")
+			if dbg {fmt.Println("*** last ***")}
 			break
 		}
 	} //for loop end
 
-	fmt.Println ("*** ast ***")
-	PrintAst(top)
+	PrintAst(top, "ast")
 
 }
 
-func PrintAst(n *node) {
-
+func PrintAst(n *node, msg string) {
+	fmt.Printf("******** %s Node Start: %s **********\n", msg, (*n).typ)
 	prnode(n)
 	chnum := len((*n).children)
 //    fmt.Printf("children [%d]\n", chnum)
     for i:= 0; i< chnum; i++ {
 		ch := (*n).children[i]
-		PrintAst(ch)
+		chmsg := fmt.Sprintf("child %d",i)
+		PrintAst(ch, chmsg)
 	}
+	fmt.Printf("********* %s Node End: %s ***********\n", msg, (*n).typ)
 }
 
 func prnode (n *node) {
 	fmt.Printf("type: %s\n", n.typ)
 	if len((*n).txt) > 1 {
-		fmt.Printf("text: %s\n", (*n).txt)
+		fmt.Printf("  text: %s\n", (*n).txt)
 	} else {
-		fmt.Printf("no text\n")
+		fmt.Printf("  no text\n")
+	}
+	attr:= (*n).att
+	if len(attr) > 0 {
+		fmt.Println("   attributes:")
+		for key, val := range (*n).att {
+    		fmt.Printf("      %s:%s\n", key, val)
+		}
 	}
 	par := (*n).pnode
 	if par == nil {
-		fmt.Println("no parent")
+		fmt.Println("  no parent")
 	} else {
-		fmt.Printf("parent: %s\n", par.typ)
+		fmt.Printf("  parent typ: %s\n", par.typ)
 	}
+
 	chnum := len((*n).children)
 	if chnum > 0 {
-		fmt.Printf("children [%d]\n", chnum)
+		fmt.Printf("  children [%d]\n", chnum)
 	} else {
-		fmt.Printf("no children\n")
+		fmt.Printf("  no children\n")
 	}
 	for i:= 0; i< chnum; i++ {
 		ch := (*n).children[i]
-		fmt.Printf("child[%d] -- typ: %s\n", i,(*ch).typ)
+		fmt.Printf("    child[%d] -- typ: %s\n", i,(*ch).typ)
 //		fmt.Printf("child[%d] -- txt: %s\n", i,(*ch).txt)
 	}
 }
